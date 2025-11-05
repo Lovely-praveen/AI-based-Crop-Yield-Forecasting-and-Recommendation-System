@@ -1,0 +1,1 @@
+State_encoded,Crop_encoded,Year,Temperature,Rainfall,Humidity,Soil_pH,Nitrogen,Phosphorus,Potassium,Organic_Carbon
