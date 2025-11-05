@@ -11,6 +11,16 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 
+
+# Get the absolute path to the directory where this script (app.py) is
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def get_path(relative_path):
+    """Constructs the full, absolute path for a file."""
+    return os.path.join(BASE_DIR, relative_path)
+
+
+
 # Page configuration
 st.set_page_config(
     page_title="🌾 AI Crop Yield Forecasting",
@@ -48,7 +58,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Check if models exist
+# Check if models exist (Uses the new get_path() function)
 def check_models_exist():
     required_files = [
         'models/linear_regression_model.pkl',
@@ -57,22 +67,25 @@ def check_models_exist():
         'models/scaler.pkl',
         'models/label_encoders.pkl'
     ]
-    missing = [f for f in required_files if not os.path.exists(f)]
+    # Check for missing files using the correct full path
+    missing = [f for f in required_files if not os.path.exists(get_path(f))]
     return len(missing) == 0, missing
 
-# Load models and preprocessors
+# Load models and preprocessors (Uses the new get_path() function)
 @st.cache_resource
 def load_models():
     try:
-        lr_model = joblib.load('models/linear_regression_model.pkl')
-        rf_model = joblib.load('models/random_forest_model.pkl')
-        xgb_model = joblib.load('models/xgboost_model.pkl')
-        scaler = joblib.load('models/scaler.pkl')
-        label_encoders = joblib.load('models/label_encoders.pkl')
+        lr_model = joblib.load(get_path('models/linear_regression_model.pkl'))
+        rf_model = joblib.load(get_path('models/random_forest_model.pkl'))
+        xgb_model = joblib.load(get_path('models/xgboost_model.pkl'))
+        scaler = joblib.load(get_path('models/scaler.pkl'))
+        label_encoders = joblib.load(get_path('models/label_encoders.pkl'))
+        
+        best_model_path = get_path('models/best_model_name.txt')
         
         # Load best model name if exists
-        if os.path.exists('models/best_model_name.txt'):
-            with open('models/best_model_name.txt', 'r') as f:
+        if os.path.exists(best_model_path):
+            with open(best_model_path, 'r') as f:
                 best_model_name = f.read().strip()
         else:
             best_model_name = 'Random Forest'
@@ -89,15 +102,16 @@ def load_models():
         st.error(f"❌ Error loading models: {str(e)}")
         return None
 
-# Load dataset
+# Load dataset (Uses the new get_path() function)
 @st.cache_data
 def load_data():
     try:
-        if not os.path.exists('crop_yield_data.csv'):
+        data_path = get_path('crop_yield_data.csv')
+        if not os.path.exists(data_path):
             st.error("❌ Dataset file 'crop_yield_data.csv' not found!")
             st.info("💡 Please run: python generate_dataset.py")
             return None
-        df = pd.read_csv('crop_yield_data.csv')
+        df = pd.read_csv(data_path)
         return df
     except Exception as e:
         st.error(f"❌ Error loading dataset: {str(e)}")
@@ -201,7 +215,7 @@ def main():
         st.error("❌ Required model files are missing!")
         st.warning("Missing files:")
         for f in missing_files:
-            st.write(f"   • {f}")
+            st.write(f"  • {f}")
         st.info("💡 **Solution**: Run the following commands in order:")
         st.code("python generate_dataset.py\npython model_training.py", language="bash")
         st.stop()
@@ -377,8 +391,8 @@ def main():
             yearly_yield = df.groupby('Year')['Yield'].mean().reset_index()
             
             fig = px.line(yearly_yield, x='Year', y='Yield', 
-                         title='Average Crop Yield Over Years',
-                         markers=True)
+                          title='Average Crop Yield Over Years',
+                          markers=True)
             fig.update_layout(xaxis_title="Year", yaxis_title="Yield (tons/ha)")
             st.plotly_chart(fig, use_container_width=True)
             
@@ -387,8 +401,8 @@ def main():
             sample_data = df.sample(min(1000, len(df)))
             
             fig = px.scatter(sample_data, x='Rainfall', y='Yield', 
-                           color='Crop', title='Rainfall Impact on Yield',
-                           opacity=0.6)
+                             color='Crop', title='Rainfall Impact on Yield',
+                             opacity=0.6)
             st.plotly_chart(fig, use_container_width=True)
         
         with tab2:
@@ -397,9 +411,9 @@ def main():
             crop_yield = df.groupby('Crop')['Yield'].mean().sort_values(ascending=False).reset_index()
             
             fig = px.bar(crop_yield, x='Crop', y='Yield',
-                        title='Average Yield by Crop Type',
-                        color='Yield',
-                        color_continuous_scale='Greens')
+                         title='Average Yield by Crop Type',
+                         color='Yield',
+                         color_continuous_scale='Greens')
             st.plotly_chart(fig, use_container_width=True)
             
             # Crop distribution
@@ -407,7 +421,7 @@ def main():
             crop_counts.columns = ['Crop', 'Count']
             
             fig = px.pie(crop_counts, values='Count', names='Crop',
-                        title='Crop Distribution in Dataset')
+                         title='Crop Distribution in Dataset')
             st.plotly_chart(fig, use_container_width=True)
         
         with tab3:
@@ -416,9 +430,9 @@ def main():
             state_yield = df.groupby('State')['Yield'].mean().sort_values(ascending=False).reset_index()
             
             fig = px.bar(state_yield, x='State', y='Yield',
-                        title='Average Yield by State',
-                        color='Yield',
-                        color_continuous_scale='Blues')
+                         title='Average Yield by State',
+                         color='Yield',
+                         color_continuous_scale='Blues')
             fig.update_xaxes(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
         
@@ -427,12 +441,12 @@ def main():
             
             # Correlation heatmap
             numeric_cols = ['Temperature', 'Rainfall', 'Humidity', 'Soil_pH', 
-                          'Nitrogen', 'Phosphorus', 'Potassium', 'Organic_Carbon', 'Yield']
+                            'Nitrogen', 'Phosphorus', 'Potassium', 'Organic_Carbon', 'Yield']
             corr_data = df[numeric_cols].corr()
             
             fig, ax = plt.subplots(figsize=(10, 8))
             sns.heatmap(corr_data, annot=True, fmt='.2f', cmap='coolwarm', 
-                       center=0, square=True, ax=ax)
+                        center=0, square=True, ax=ax)
             plt.title('Feature Correlation Matrix')
             st.pyplot(fig, use_container_width=True)
             plt.close()
@@ -453,8 +467,8 @@ def main():
         df_copy['Crop_encoded'] = le_crop.transform(df_copy['Crop'])
         
         feature_columns = ['State_encoded', 'Crop_encoded', 'Year', 'Temperature', 
-                          'Rainfall', 'Humidity', 'Soil_pH', 'Nitrogen', 
-                          'Phosphorus', 'Potassium', 'Organic_Carbon']
+                           'Rainfall', 'Humidity', 'Soil_pH', 'Nitrogen', 
+                           'Phosphorus', 'Potassium', 'Organic_Carbon']
         
         X = df_copy[feature_columns]
         y = df_copy['Yield']
@@ -499,10 +513,10 @@ def main():
         }).sort_values('Importance', ascending=False)
         
         fig = px.bar(feature_importance, x='Importance', y='Feature',
-                    orientation='h',
-                    title='Feature Importance Rankings',
-                    color='Importance',
-                    color_continuous_scale='Viridis')
+                     orientation='h',
+                     title='Feature Importance Rankings',
+                     color='Importance',
+                     color_continuous_scale='Viridis')
         st.plotly_chart(fig, use_container_width=True)
         
         # Model predictions vs actual
@@ -521,17 +535,17 @@ def main():
         
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=y_test_array[indices], y=predictions[indices],
-                                mode='markers',
-                                name='Predictions',
-                                marker=dict(size=5, opacity=0.6)))
+                                 mode='markers',
+                                 name='Predictions',
+                                 marker=dict(size=5, opacity=0.6)))
         fig.add_trace(go.Scatter(x=[y_test.min(), y_test.max()],
-                                y=[y_test.min(), y_test.max()],
-                                mode='lines',
-                                name='Perfect Prediction',
-                                line=dict(color='red', dash='dash')))
+                                 y=[y_test.min(), y_test.max()],
+                                 mode='lines',
+                                 name='Perfect Prediction',
+                                 line=dict(color='red', dash='dash')))
         fig.update_layout(title=f'{selected_model}: Predicted vs Actual Yield',
-                         xaxis_title='Actual Yield (tons/ha)',
-                         yaxis_title='Predicted Yield (tons/ha)')
+                          xaxis_title='Actual Yield (tons/ha)',
+                          yaxis_title='Predicted Yield (tons/ha)')
         st.plotly_chart(fig, use_container_width=True)
     
     # ABOUT PAGE
@@ -577,4 +591,4 @@ def main():
         """)
 
 if __name__ == "__main__":
-    main() 
+    main()
